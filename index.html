@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>综合学习乐园 (V8_final)</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8f6f2; --card-bg-color: #ffffff; --char-color: #34495e;
+            --grid-color: #e5e7eb; --red-color: #c0392b; --blue-color: #3498db;
+            --yellow-color: #f39c12; --gray-color: #7f8c8d; --green-color: #27ae60;
+            --selection-bg-color: #d4eaf7; --selection-border-color: var(--blue-color);
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-char: 'KaiTi', '楷体', serif;
+            --font-latin: Arial, sans-serif;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { font-family: var(--font-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px 0; background-color: var(--bg-color); background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23dcdcdc' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+        .screen { position: absolute; opacity: 1; visibility: visible; transform: translateY(0); transition: opacity 0.35s ease, transform 0.35s ease, visibility 0.35s; }
+        .screen.hidden { opacity: 0; transform: translateY(-10px); visibility: hidden; }
+        .card { background-color: var(--card-bg-color); padding: 30px; border-radius: 20px; box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1); width: 90vw; max-width: 500px; text-align: center; }
+        h1 { margin: 0 0 25px 0; font-size: 2.2em; color: var(--char-color); }
+        .btn { width: 100%; padding: 14px; margin-top: 10px; font-size: 1.1em; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; transition: transform 0.1s ease, filter 0.2s; }
+        .btn:hover { filter: brightness(1.05); }
+        .btn:active { transform: scale(0.97); }
+        .btn-lg { padding: 16px; font-size: 1.2em; }
+        .btn-primary { background-color: var(--blue-color); } .btn-warning { background-color: var(--yellow-color); } .btn-danger { background-color: var(--red-color); } .btn-secondary { background-color: var(--gray-color); } .btn-success { background-color: var(--green-color); }
+        .btn-group { display: flex; gap: 15px; }
+        input, textarea, select { width: 100%; padding: 12px; font-size: 1em; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 12px; }
+        details { border: 1px solid #eee; border-radius: 12px; margin-top: 15px; }
+        summary { font-weight: bold; cursor: pointer; padding: 15px; list-style: none; display: block; }
+        summary::-webkit-details-marker { display: none; }
+        summary::before { content: '▶ '; font-size: 0.8em; }
+        details[open] summary::before { content: '▼ '; }
+        .details-content { padding: 0 15px 15px 15px; }
+        #home-screen .btn { margin-bottom: 10px; }
+        
+        #char-display-container { position: relative; width: 100%; margin-bottom: 25px; display: flex; justify-content: center; align-items: center; min-height: 320px; padding: 5px; }
+        #char-display { display: flex; justify-content: center; align-items: center; width: auto; max-width: 100%; gap: 15px; color: var(--char-color); animation: fadeIn 0.4s ease; transition: transform 0.2s ease-out; }
+        
+        .char-cell-container { position: relative; display: flex; justify-content: center; align-items: center; flex-shrink: 0; width: 150px; height: 150px; }
+        .char-cell-container.is-single { width: 320px; height: 320px; }
+        
+        .char-cell-grid { position: absolute; width: 100%; height: 100%; border: 3px solid var(--grid-color); }
+        .char-cell-grid::before, .char-cell-grid::after { content: ''; position: absolute; background-color: var(--grid-color); }
+        .char-cell-grid::before { width: 2px; height: 100%; top: 0; left: 50%; transform: translateX(-50%); }
+        .char-cell-grid::after { height: 2px; width: 100%; top: 50%; left: 0; transform: translateY(-50%); }
+        .is-single .char-cell-grid { border-width: 4px; }
+
+        .char-cell-text { position: relative; font-family: var(--font-char); font-size: 120px; }
+        .is-single .char-cell-text { font-size: 260px; }
+
+        .char-item-latin { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; font-family: var(--font-latin); font-weight: bold; text-align: center; max-width: 100%; font-size: clamp(3rem, 10vw, 6rem); line-height: 1.2; }
+        .char-item-latin.is-pinyin { white-space: nowrap; }
+
+        #stats { position: absolute; top: -10px; right: 0; font-size: 1.1em; color: #888; background-color: rgba(248, 246, 242, 0.8); padding: 5px 12px; border-radius: 10px; z-index: 3; }
+        #bank-selection-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+        @media (max-width: 520px) { #bank-selection-list { grid-template-columns: repeat(2, 1fr); } :root { --font-char: var(--font-main); } .char-cell-container.is-single { width: 280px; height: 280px; } .is-single .char-cell-text { font-size: 220px; } .char-item-latin { font-size: clamp(2.5rem, 12vw, 5rem); } }
+        .bank-item { padding: 25px 10px; border: 2px solid #eee; border-radius: 12px; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: all 0.2s ease-in-out; text-align: center; }
+        .bank-item.selected { background-color: var(--selection-bg-color); border-color: var(--selection-border-color); color: var(--blue-color); transform: scale(1.05); }
+        #history-list { font-size: 0.9em; text-align: left; padding-left: 10px; }
+        .history-item .wrong-chars { color: var(--red-color); font-weight: bold; }
+        
+        /* --- 最终修复：从动画中移除transform，以防止缩放冲突 --- */
+        @keyframes fadeIn { 
+            from { opacity: 0; } 
+            to { opacity: 1; } 
+        }
+    </style>
+</head>
+<body>
+    <div id="home-screen" class="screen card"><h1>综合学习乐园</h1><button id="select-hanzi" class="btn btn-lg btn-primary">学习汉字</button><button id="select-pinyin" class="btn btn-lg btn-success">学习拼音</button><button id="select-english" class="btn btn-lg btn-danger">学习英语</button><details><summary>数据管理</summary><div class="details-content"><p style="text-align:left; font-size: 0.9em; color: #555;">您可以将所有数据（字库、错题本）导出为文件备份，或从文件导入，方便在不同电脑间使用。</p><div class="btn-group"><button id="export-data-btn" class="btn btn-secondary">导出全部数据</button><button id="import-data-btn" class="btn btn-secondary">导入数据</button></div><input type="file" id="import-file-input" style="display: none;" accept=".json"></div></details></div>
+    <div id="setup-screen" class="screen card hidden"><h1 id="setup-title"></h1><div id="bank-selection-list"></div><div class="btn-group"><button id="start-btn" class="btn btn-primary btn-lg">开始学习</button><button id="practice-wrong-btn" class="btn btn-warning btn-lg">练习错题本</button></div><details><summary>内容管理</summary><div class="details-content"><h4>字库/词库编辑</h4><select id="bank-edit-select"></select><input type="text" id="edit-bank-name" placeholder="词库名称"><textarea id="edit-bank-chars" rows="4" placeholder="每个词条占一行, 用回车分隔"></textarea><div class="btn-group"><button id="save-bank-btn" class="btn btn-secondary">保存/更新</button><button id="delete-bank-btn" class="btn btn-danger">删除选中</button></div><h4 style="margin-top:20px; margin-bottom:10px;">错题本编辑</h4><textarea id="edit-wrong-chars" rows="3" placeholder="手动编辑错题本, 每行一个"></textarea><button id="save-wrong-chars-btn" class="btn btn-secondary">保存错题本</button></div></details><details><summary>练习历史</summary><div id="history-list" class="details-content"></div></details><button id="back-to-home-btn" class="btn btn-secondary" style="margin-top: 20px;">返回主页</button></div>
+    <div id="main-screen" class="screen card hidden"><div id="char-display-container"><div id="stats"><span id="timer">00:00</span> | 剩余: <span id="remaining-count">0</span></div><div id="char-display"></div></div><div class="btn-group"><button id="correct-btn" class="btn btn-success btn-lg">😊 认识</button><button id="incorrect-btn" class="btn btn-danger btn-lg">😥 不认识</button></div></div>
+    <div id="result-screen" class="screen card hidden"><h1 id="result-title"></h1><p>总用时：<strong id="final-time"></strong></p><p>本次错题：<strong id="incorrect-list" style="color: var(--red-color);"></strong></p><button id="home-btn" class="btn btn-secondary">返回主页</button></div>
+
+    <script>
+        const $ = (selector) => document.querySelector(selector);
+        const screens = { home: $("#home-screen"), setup: $("#setup-screen"), main: $("#main-screen"), result: $("#result-screen") };
+        const elements = {
+            selectHanziBtn: $("#select-hanzi"), selectPinyinBtn: $("#select-pinyin"), selectEnglishBtn: $("#select-english"), exportDataBtn: $("#export-data-btn"), importDataBtn: $("#import-data-btn"), importFileInput: $("#import-file-input"), setupTitle: $("#setup-title"), backToHomeBtn: $("#back-to-home-btn"), bankSelectionList: $("#bank-selection-list"), bankEditSelect: $("#bank-edit-select"), startBtn: $("#start-btn"), practiceWrongBtn: $("#practice-wrong-btn"), editBankName: $("#edit-bank-name"), editBankChars: $("#edit-bank-chars"), saveBankBtn: $("#save-bank-btn"), deleteBankBtn: $("#delete-bank-btn"), editWrongChars: $("#edit-wrong-chars"), saveWrongCharsBtn: $("#save-wrong-chars-btn"), historyList: $("#history-list"), timer: $("#timer"), remainingCount: $("#remaining-count"), charDisplay: $("#char-display"), charDisplayContainer: $("#char-display-container"), correctBtn: $("#correct-btn"), incorrectBtn: $("#incorrect-btn"), resultTitle: $("#result-title"), finalTime: $("#final-time"), incorrectList: $("#incorrect-list"), homeBtn: $("#home-btn"),
+        };
+        let state = { currentSubject: null, charsToPractice: [], currentChar: '', incorrectThisSession: [], seconds: 0, timerInterval: null, currentSessionSource: '' };
+        const DB = { get: (key, def) => JSON.parse(localStorage.getItem(key)) || def, set: (key, val) => localStorage.setItem(key, JSON.stringify(val)), getForSubject: (subject, key, def) => DB.get(`${subject}_${key}`, def), setForSubject: (subject, key, val) => DB.set(`${subject}_${key}`, val) };
+        const UI = {
+            switchScreen(s) { Object.values(screens).forEach(c=>c.classList.add('hidden')); screens[s].classList.remove('hidden'); },
+            updateSetupScreen(subject) { const titles = { hanzi: '汉字学习', pinyin: '拼音学习', english: '英语学习' }; elements.setupTitle.textContent = titles[subject]; this.renderBankSelectionList(subject); this.renderBankEditSelect(subject); this.renderWrongWordEditor(subject); this.renderHistory(subject); const wrongCount = DB.getForSubject(subject, 'wrongChars', []).length; elements.practiceWrongBtn.textContent = `练习错题本 ${wrongCount > 0 ? `(${wrongCount})` : ''}`; },
+            renderBankSelectionList(subject) { const banks = DB.getForSubject(subject, 'wordBanks', {}); const bankNames = Object.keys(banks); elements.bankSelectionList.innerHTML = bankNames.length ? '' : '<p style="text-align:center; color:#888; grid-column: 1 / -1;">请在下方管理面板创建内容库</p>'; bankNames.forEach(name => { const item = document.createElement('div'); item.className = 'bank-item'; item.textContent = name; item.dataset.bankName = name; item.onclick = () => item.classList.toggle('selected'); elements.bankSelectionList.appendChild(item); }); },
+            renderBankEditSelect(subject) { const banks = DB.getForSubject(subject, 'wordBanks', {}); const bankNames = Object.keys(banks); elements.bankEditSelect.innerHTML = bankNames.length ? '' : '<option value="">无内容库可编辑</option>'; bankNames.forEach(name => elements.bankEditSelect.add(new Option(name, name))); this.populateBankEditor(subject, elements.bankEditSelect.value); },
+            populateBankEditor(subject, bankName) { const banks = DB.getForSubject(subject, 'wordBanks', {}); elements.editBankName.value = banks[bankName] ? bankName : ''; elements.editBankChars.value = banks[bankName] ? banks[bankName].join('\n') : ''; },
+            renderWrongWordEditor(subject) { elements.editWrongChars.value = DB.getForSubject(subject, 'wrongChars', []).join('\n'); },
+            renderHistory(subject) { const history = DB.getForSubject(subject, 'practiceHistory', []); elements.historyList.innerHTML = history.length ? '' : '<p>暂无历史记录</p>'; history.slice(0, 5).forEach(item => { elements.historyList.innerHTML += `<div class="history-item"><p><strong>${item.date} [${item.source}]</strong> - ${item.time}<br>错: <span class="wrong-chars">${item.wrong.join(', ') || '无'}</span></p></div>`; }); },
+            updateStats() { elements.remainingCount.textContent = state.charsToPractice.length; elements.timer.textContent = this.formatTime(state.seconds); },
+            formatTime: (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`
+        };
+        
+        function resetAppToHome() {
+            clearInterval(state.timerInterval);
+            state = { currentSubject: null, charsToPractice: [], currentChar: '', incorrectThisSession: [], seconds: 0, timerInterval: null, currentSessionSource: '' };
+            elements.charDisplay.innerHTML = '';
+            elements.charDisplay.style.transform = 'scale(1)';
+            UI.switchScreen('home');
+        }
+
+        function startSession(chars, sourceName) { if (!chars || chars.length === 0) { alert('没有需要学习的内容！'); return; } state.charsToPractice = shuffleArray([...new Set(chars)]); state.incorrectThisSession = []; state.currentSessionSource = sourceName; UI.switchScreen('main'); startTimer(); nextChar(); }
+        
+        function nextChar() {
+            UI.updateStats();
+            if (state.charsToPractice.length === 0) { endSession(); return; }
+            state.currentChar = state.charsToPractice[0];
+            const display = elements.charDisplay;
+            const displayContainer = elements.charDisplayContainer;
+            
+            display.style.visibility = 'hidden';
+            display.style.animation = 'none';
+            display.innerHTML = '';
+            display.style.transform = ''; // 重置transform以正确测量
+
+            if (state.currentSubject === 'hanzi') {
+                const isSingle = state.currentChar.length === 1;
+                for (const char of state.currentChar) {
+                    const container = document.createElement('div');
+                    container.className = 'char-cell-container';
+                    if (isSingle) container.classList.add('is-single');
+                    container.innerHTML = `<div class="char-cell-grid"></div><div class="char-cell-text">${char}</div>`;
+                    display.appendChild(container);
+                }
+            } else {
+                const item = document.createElement('div');
+                item.className = 'char-item-latin';
+                if (state.currentSubject === 'pinyin') { item.classList.add('is-pinyin'); }
+                item.textContent = state.currentChar;
+                display.appendChild(item);
+            }
+            
+            requestAnimationFrame(() => {
+                const containerWidth = displayContainer.clientWidth;
+                const contentWidth = display.scrollWidth;
+                if (contentWidth > containerWidth) {
+                    const scale = (containerWidth - 20) / contentWidth;
+                    display.style.transform = `scale(${scale})`;
+                }
+                display.style.visibility = 'visible';
+                display.style.animation = 'fadeIn 0.4s ease';
+            });
+        }
+
+        function handleAnswer(isCorrect) { if (isCorrect) { state.charsToPractice.shift(); } else { const wrongChars = new Set(DB.getForSubject(state.currentSubject, 'wrongChars', [])); wrongChars.add(state.currentChar); DB.setForSubject(state.currentSubject, 'wrongChars', [...wrongChars]); if (!state.incorrectThisSession.includes(state.currentChar)) { state.incorrectThisSession.push(state.currentChar); } if (state.charsToPractice.length > 1) { const incorrectItem = state.charsToPractice.shift(); const halfway = Math.ceil(state.charsToPractice.length / 2); const insertIndex = halfway + Math.floor(Math.random() * (state.charsToPractice.length - halfway + 1)); state.charsToPractice.splice(insertIndex, 0, incorrectItem); } } nextChar(); }
+        function endSession() { clearInterval(state.timerInterval); state.timerInterval = null; const history = DB.getForSubject(state.currentSubject, 'practiceHistory', []); history.unshift({ date: new Date().toLocaleDateString(), source: state.currentSessionSource, time: UI.formatTime(state.seconds), wrong: state.incorrectThisSession }); DB.setForSubject(state.currentSubject, 'practiceHistory', history.slice(0, 10)); elements.finalTime.textContent = UI.formatTime(state.seconds); if (state.incorrectThisSession.length === 0) { elements.resultTitle.textContent = "太棒了，全对！🎉"; elements.incorrectList.textContent = '无'; confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } }); } else { elements.resultTitle.textContent = "很棒，继续加油！💪"; elements.incorrectList.textContent = state.incorrectThisSession.join('，'); confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } }); } UI.switchScreen('result'); }
+        function initializeSubject(subject) { state.currentSubject = subject; UI.updateSetupScreen(subject); UI.switchScreen('setup'); }
+        function initDefaultData() { if (!localStorage.getItem('pinyin_wordBanks')) { const pinyinDefaults = { '声母': 'b p m f d t n l g k h j q x zh ch sh r z c s y w'.split(' '),'韵母': 'a o e i u ü ai ei ui ao ou iu ie üe er an en in un ün ang eng ing ong'.split(' '),'整体认读': 'zhi chi shi ri zi ci si yi wu yu ye yue yuan yin yun ying'.split(' ')}; DB.setForSubject('pinyin', 'wordBanks', pinyinDefaults); } if (!localStorage.getItem('english_wordBanks')) { const englishDefaults = { '大写字母': 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z'.split(' '),'小写字母': 'a b c d e f g h i j k l m n o p q r s t u v w x y z'.split(' ')}; DB.setForSubject('english', 'wordBanks', englishDefaults); } if (!localStorage.getItem('hanzi_wordBanks')) { const hanziDefaults = { '基础常用字': '的\n一\n是\n了\n我\n不\n人\n和\n在\n他\n有\n这\n个\n上\n们\n来\n到\n大\n为\n子\n中\n你\n说\n生\n国\n过\n会'.split(/\n+/)}; DB.setForSubject('hanzi', 'wordBanks', hanziDefaults); } }
+        function exportData() { const dataToExport = {}; const keys = ['hanzi_wordBanks', 'hanzi_wrongChars', 'hanzi_practiceHistory', 'pinyin_wordBanks', 'pinyin_wrongChars', 'pinyin_practiceHistory', 'english_wordBanks', 'english_wrongChars', 'english_practiceHistory']; keys.forEach(key => { dataToExport[key] = JSON.parse(localStorage.getItem(key)) || null; }); const dataStr = JSON.stringify(dataToExport, null, 2); const blob = new Blob([dataStr], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `综合学习乐园_备份_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); alert('数据已导出！请妥善保管备份文件。'); }
+        function importData(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const data = JSON.parse(e.target.result); const keys = Object.keys(data); if (!keys.some(k => k.includes('_wordBanks') || k.includes('_wrongChars'))) { throw new Error("无效的数据文件"); } if (confirm('导入数据会覆盖现有所有内容，确定要继续吗？')) { localStorage.clear(); keys.forEach(key => { if(data[key]) localStorage.setItem(key, JSON.stringify(data[key])); }); alert('数据导入成功！应用将重新加载。'); location.reload(); } } catch (error) { alert('导入失败！请确保文件是由本应用导出的正确备份文件。\n错误: ' + error.message); } finally { event.target.value = ''; } }; reader.readAsText(file); }
+        const startTimer = () => { clearInterval(state.timerInterval); state.seconds=0; UI.updateStats(); state.timerInterval = setInterval(() => { state.seconds++; UI.updateStats(); }, 1000); };
+        const shuffleArray = (a) => { for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+        
+        window.addEventListener('load', () => { initDefaultData(); UI.switchScreen('home'); });
+        elements.selectHanziBtn.addEventListener('click', () => initializeSubject('hanzi'));
+        elements.selectPinyinBtn.addEventListener('click', () => initializeSubject('pinyin'));
+        elements.selectEnglishBtn.addEventListener('click', () => initializeSubject('english'));
+        elements.bankEditSelect.addEventListener('change', () => UI.populateBankEditor(state.currentSubject, elements.bankEditSelect.value));
+        elements.saveBankBtn.addEventListener('click', () => { const name = elements.editBankName.value.trim(); const chars = elements.editBankChars.value.trim().split(/\n+/).filter(Boolean); if (!name || chars.length === 0) { alert('名称和内容都不能为空！\n请注意：每个词条请用【换行】分隔。'); return; } const banks = DB.getForSubject(state.currentSubject, 'wordBanks', {}); banks[name] = chars; DB.setForSubject(state.currentSubject, 'wordBanks', banks); UI.updateSetupScreen(state.currentSubject); elements.bankEditSelect.value = name; alert(`“${name}”已保存/更新！`); });
+        elements.saveWrongCharsBtn.addEventListener('click', () => { const chars = elements.editWrongChars.value.trim().split(/\n+/).filter(Boolean); DB.setForSubject(state.currentSubject, 'wrongChars', [...new Set(chars)]); UI.updateSetupScreen(state.currentSubject); alert('错题本已更新！'); });
+        elements.deleteBankBtn.addEventListener('click', () => { const bankName = elements.bankEditSelect.value; if (!bankName) { alert('没有选中的内容库可以删除！'); return; } if (confirm(`确定要永久删除“${bankName}”吗？`)) { const banks = DB.getForSubject(state.currentSubject, 'wordBanks', {}); delete banks[bankName]; DB.setForSubject(state.currentSubject, 'wordBanks', banks); UI.updateSetupScreen(state.currentSubject); } });
+        elements.startBtn.addEventListener('click', () => { const selectedItems = document.querySelectorAll('.bank-item.selected'); if (selectedItems.length === 0) { alert('请至少选择一个内容库！'); return; } const selectedBankNames = [...selectedItems].map(item => item.dataset.bankName); const banks = DB.getForSubject(state.currentSubject, 'wordBanks', {}); const allChars = selectedBankNames.reduce((acc, name) => { if (banks[name] && Array.isArray(banks[name])) { acc.push(...banks[name]); } return acc; }, []); startSession(allChars, `练习: ${selectedBankNames.join(', ')}`); });
+        elements.practiceWrongBtn.addEventListener('click', () => { const wrongChars = DB.getForSubject(state.currentSubject, 'wrongChars', []); if (wrongChars.length === 0) { alert('错题本是空的，真棒！'); return; } startSession(wrongChars, '错题本'); });
+        elements.correctBtn.addEventListener('click', () => handleAnswer(true));
+        elements.incorrectBtn.addEventListener('click', () => handleAnswer(false));
+        elements.homeBtn.addEventListener('click', resetAppToHome);
+        elements.backToHomeBtn.addEventListener('click', resetAppToHome);
+        elements.exportDataBtn.addEventListener('click', exportData);
+        elements.importDataBtn.addEventListener('click', () => elements.importFileInput.click());
+        elements.importFileInput.addEventListener('change', importData);
+    </script>
+</body>
+</html>
